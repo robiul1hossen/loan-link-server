@@ -86,7 +86,7 @@ async function run() {
     app.get("/loans/all", async (req, res) => {
       try {
         const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 11;
+        const limit = parseInt(req.query.limit) || 10;
 
         const skip = (page - 1) * limit;
 
@@ -135,6 +135,12 @@ async function run() {
         console.error("Error adding loans:", error);
         res.status(500).send({ message: "Failed to add a loan", error });
       }
+    });
+    app.delete("/loans/:id", verifyFBToken, verifyAdmin, async (req, res) => {
+      const { id } = req.params;
+      const query = { _id: new ObjectId(id) };
+      const result = await loansCollection.deleteOne(query);
+      res.send(result);
     });
 
     // users related apis
