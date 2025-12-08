@@ -86,7 +86,7 @@ async function run() {
     app.get("/loans/all", async (req, res) => {
       try {
         const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
+        const limit = parseInt(req.query.limit) || 11;
 
         const skip = (page - 1) * limit;
 
@@ -120,7 +120,7 @@ async function run() {
         res.status(500).send({ message: "Failed to fetch loan", error });
       }
     });
-    app.post("/loans", async (req, res) => {
+    app.post("/loans", verifyFBToken, verifyManager, async (req, res) => {
       try {
         const loan = req.body;
         if (!loan) {
