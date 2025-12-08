@@ -103,6 +103,12 @@ async function run() {
         res.status(500).send({ message: "Failed to fetch users", error });
       }
     });
+    app.get("/users/:id", async (req, res) => {
+      const { id } = req.params;
+      const query = { _id: new ObjectId(id) };
+      const result = await usersCollection.findOne(query);
+      res.status(200).send(result);
+    });
     app.get("/user", async (req, res) => {
       try {
         const { email } = req.query;
@@ -124,6 +130,12 @@ async function run() {
         if (!user) {
           return res.status(400).send({ message: "User data is required" });
         }
+        if (user.role === "Manager") {
+          user.roleStatus = "pending";
+        }
+        if (user.role === "Borrower") {
+          user.roleStatus = "approved";
+        }
         const result = await usersCollection.insertOne(user);
         res.status(201).send({
           message: "User added successfully",
@@ -134,12 +146,43 @@ async function run() {
         res.status(500).send({ message: "Failed to add a user", error });
       }
     });
+    app.patch("/users/role/:id", async (req, res) => {
+      const id = req.params.id;
+      const { roleStatus } = req.body;
+
+      const result = await usersCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { roleStatus } }
+      );
+
+      res.send(result);
+    });
 
     // loan application related apis
+    app.get("/loan-application", async (req, res) => {
+      try {
+        const { email } = req.query;
+        const query = {};
+        if (email) {
+          query.email = email;
+        }
+        const result = await loanApplicationsCollection
+          .find(query)
+          .sort({ createdAt: -1 })
+          .toArray();
+        res.status(200).send(result);
+      } catch (error) {
+        console.error("Error fetching loan applications:", error);
+        res
+          .status(500)
+          .send({ message: "Failed to fetch loan applications", error });
+      }
+    });
     app.post("/loan-application", async (req, res) => {
       try {
         const application = req.body;
         if (application) {
+          application.createdAt = new Date();
           application.status = "pending";
         }
         const result = await loanApplicationsCollection.insertOne(application);
@@ -152,6 +195,41 @@ async function run() {
         res
           .status(500)
           .send({ message: "Failed to add a loan application", error });
+      }
+    });
+    app.patch("/loan-application/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const loanInfo = req.body;
+        const query = { _id: new ObjectId(id) };
+        const updatedDoc = {
+          $set: {
+            ...loanInfo,
+          },
+        };
+        const result = await loanApplicationsCollection.updateOne(
+          query,
+          updatedDoc
+        );
+        res.status(200).send(result);
+      } catch (error) {
+        console.error("Error updating loan applications:", error);
+        res
+          .status(500)
+          .send({ message: "Failed to update loan applications", error });
+      }
+    });
+    app.delete("/loan-application/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const query = { _id: new ObjectId(id) };
+        const result = await loanApplicationsCollection.deleteOne(query);
+        res.status(200).send(result);
+      } catch (error) {
+        console.error("Error delete loan applications:", error);
+        res
+          .status(500)
+          .send({ message: "Failed to delete loan applications", error });
       }
     });
     // Send a ping to confirm a successful connection
