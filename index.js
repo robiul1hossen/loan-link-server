@@ -58,6 +58,15 @@ async function run() {
       }
       next();
     };
+    const verifyManager = async (req, res, next) => {
+      const email = req.decoded_email;
+      const query = { email };
+      const user = await usersCollection.findOne(query);
+      if (user?.role !== "Manager") {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      next();
+    };
 
     const db = client.db("loanLink");
     const usersCollection = db.collection("users");
