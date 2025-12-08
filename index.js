@@ -109,7 +109,7 @@ async function run() {
         res.status(500).send({ message: "Failed to fetch loans", error });
       }
     });
-    app.get("/loans/:id", async (req, res) => {
+    app.get("/loans/:id", verifyFBToken, async (req, res) => {
       try {
         const { id } = req.params;
         const query = { _id: new ObjectId(id) };
@@ -147,13 +147,13 @@ async function run() {
         res.status(500).send({ message: "Failed to fetch users", error });
       }
     });
-    app.get("/users/:id", async (req, res) => {
+    app.get("/users/:id", verifyFBToken, async (req, res) => {
       const { id } = req.params;
       const query = { _id: new ObjectId(id) };
       const result = await usersCollection.findOne(query);
       res.status(200).send(result);
     });
-    app.get("/user", async (req, res) => {
+    app.get("/user", verifyFBToken, async (req, res) => {
       try {
         const { email } = req.query;
         const query = {};
@@ -166,6 +166,12 @@ async function run() {
         console.error("Error fetching users:", error);
         res.status(500).send({ message: "Failed to fetch users", error });
       }
+    });
+    app.get("/users/:email/role", async (req, res) => {
+      const email = req.params.email;
+      const query = { email };
+      const result = await usersCollection.findOne(query);
+      res.send({ role: result?.role || "Borrower" });
     });
 
     app.post("/users", async (req, res) => {
@@ -190,39 +196,49 @@ async function run() {
         res.status(500).send({ message: "Failed to add a user", error });
       }
     });
-    app.patch("/users/role/:id", async (req, res) => {
-      const id = req.params.id;
-      const { roleStatus } = req.body;
+    app.patch(
+      "/users/role/:id",
+      verifyFBToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const { roleStatus } = req.body;
 
-      const result = await usersCollection.updateOne(
-        { _id: new ObjectId(id) },
-        { $set: { roleStatus } }
-      );
+        const result = await usersCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { roleStatus } }
+        );
 
-      res.send(result);
-    });
+        res.send(result);
+      }
+    );
 
     // loan application related apis
-    app.get("/loan-application", async (req, res) => {
-      try {
-        const { email } = req.query;
-        const query = {};
-        if (email) {
-          query.email = email;
+    app.get(
+      "/loan-application",
+      verifyFBToken,
+      verifyAdmin,
+      async (req, res) => {
+        try {
+          const { email } = req.query;
+          const query = {};
+          if (email) {
+            query.email = email;
+          }
+          const result = await loanApplicationsCollection
+            .find(query)
+            .sort({ createdAt: -1 })
+            .toArray();
+          res.status(200).send(result);
+        } catch (error) {
+          console.error("Error fetching loan applications:", error);
+          res
+            .status(500)
+            .send({ message: "Failed to fetch loan applications", error });
         }
-        const result = await loanApplicationsCollection
-          .find(query)
-          .sort({ createdAt: -1 })
-          .toArray();
-        res.status(200).send(result);
-      } catch (error) {
-        console.error("Error fetching loan applications:", error);
-        res
-          .status(500)
-          .send({ message: "Failed to fetch loan applications", error });
       }
-    });
-    app.post("/loan-application", async (req, res) => {
+    );
+    app.post("/loan-application", verifyFBToken, async (req, res) => {
       try {
         const application = req.body;
         if (application) {
@@ -241,7 +257,7 @@ async function run() {
           .send({ message: "Failed to add a loan application", error });
       }
     });
-    app.patch("/loan-application/:id", async (req, res) => {
+    app.patch("/loan-application/:id", verifyFBToken, async (req, res) => {
       try {
         const { id } = req.params;
         const loanInfo = req.body;
@@ -263,7 +279,7 @@ async function run() {
           .send({ message: "Failed to update loan applications", error });
       }
     });
-    app.delete("/loan-application/:id", async (req, res) => {
+    app.delete("/loan-application/:id", verifyFBToken, async (req, res) => {
       try {
         const { id } = req.params;
         const query = { _id: new ObjectId(id) };
