@@ -49,6 +49,16 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
 
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded_email;
+      const query = { email };
+      const user = await usersCollection.findOne(query);
+      if (user?.role !== "Admin") {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      next();
+    };
+
     const db = client.db("loanLink");
     const usersCollection = db.collection("users");
     const loansCollection = db.collection("loans");
@@ -119,7 +129,7 @@ async function run() {
     });
 
     // users related apis
-    app.get("/users", verifyFBToken, async (req, res) => {
+    app.get("/users", verifyFBToken, verifyAdmin, async (req, res) => {
       try {
         const result = await usersCollection.find().toArray();
         res.status(200).send(result);
