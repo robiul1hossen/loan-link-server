@@ -2,6 +2,8 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const stripe = require("stripe")(process.env.PAYMENT_GETAWAY_SECRET);
+
 const admin = require("firebase-admin");
 
 const decoded = Buffer.from(process.env.FB_SERVICE_KEY, "base64").toString(
@@ -23,7 +25,7 @@ app.use(cors());
 const verifyFBToken = async (req, res, next) => {
   const token = req.headers.authorization;
   if (!token) {
-    res.status(401).send({ message: "unauthorize access" });
+    return res.status(401).send({ message: "unauthorize access" });
   }
   try {
     const tokenId = token.split(" ")[1];
@@ -300,6 +302,31 @@ async function run() {
           .status(500)
           .send({ message: "Failed to delete loan applications", error });
       }
+    });
+
+    // payment related apis
+    app.post("/create-checkout-session", async (req, res) => {
+      const paymentInfo = req.body;
+      const session = await stripe.checkout.sessions.create({
+        line_items: [
+          {
+            // price: "prod_TZgKjNiuhirw1C",
+            price: "price_1ScWxQ2a4KlqyhEpIlSPnr4N",
+            quantity: 1,
+          },
+        ],
+
+        mode: "payment",
+        metadata: {
+          applicationId: paymentInfo.applicationId,
+          loanTitle: paymentInfo.title,
+          applicantEmail: paymentInfo.email,
+        },
+        success_url: `${process.env.SITE_DOMAIN}/dashboard/success`,
+        cancel_url: `${process.env.SITE_DOMAIN}/dashboard/cancelled`,
+      });
+      console.log(session);
+      res.send({ url: session.url });
     });
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
