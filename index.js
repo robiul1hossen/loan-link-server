@@ -186,6 +186,12 @@ async function run() {
         if (!user) {
           return res.status(400).send({ message: "User data is required" });
         }
+        const email = user.email;
+        const query = { email };
+        const isExist = await usersCollection.findOne(query);
+        if (isExist) {
+          return res.send({ message: "user already exist" });
+        }
         if (user.role === "Manager") {
           user.roleStatus = "pending";
         }
@@ -220,36 +226,33 @@ async function run() {
     );
 
     // loan application related apis
-    app.get(
-      "/loan-application",
-      verifyFBToken,
-      verifyAdmin,
-      async (req, res) => {
-        try {
-          const { email } = req.query;
-          const query = {};
-          if (email) {
-            query.email = email;
-          }
-          const result = await loanApplicationsCollection
-            .find(query)
-            .sort({ createdAt: -1 })
-            .toArray();
-          res.status(200).send(result);
-        } catch (error) {
-          console.error("Error fetching loan applications:", error);
-          res
-            .status(500)
-            .send({ message: "Failed to fetch loan applications", error });
+    app.get("/loan-application", verifyFBToken, async (req, res) => {
+      try {
+        const { email } = req.query;
+        const query = {};
+        if (email) {
+          query.email = email;
         }
+        const result = await loanApplicationsCollection
+          .find(query)
+          .sort({ createdAt: -1 })
+          .toArray();
+        res.status(200).send(result);
+      } catch (error) {
+        console.error("Error fetching loan applications:", error);
+        res
+          .status(500)
+          .send({ message: "Failed to fetch loan applications", error });
       }
-    );
+    });
     app.post("/loan-application", verifyFBToken, async (req, res) => {
       try {
         const application = req.body;
         if (application) {
           application.createdAt = new Date();
           application.status = "pending";
+          application.applicationStatus = "unpaid";
+          application.applicationFee = 10;
         }
         const result = await loanApplicationsCollection.insertOne(application);
         res.status(201).send({
