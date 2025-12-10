@@ -228,12 +228,15 @@ async function run() {
     );
 
     // loan application related apis
-    app.get("/loan-application", verifyFBToken, async (req, res) => {
+    app.get("/loan-application", async (req, res) => {
       try {
-        const { email } = req.query;
+        const { email, applicationStatus } = req.query;
         const query = {};
         if (email) {
           query.email = email;
+        }
+        if (applicationStatus) {
+          query.applicationStatus = applicationStatus;
         }
         const result = await loanApplicationsCollection
           .find(query)
