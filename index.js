@@ -81,7 +81,6 @@ async function run() {
         const result = await loansCollection.find().limit(6).toArray();
         res.status(200).send(result);
       } catch (error) {
-        console.error("Error fetching loans:", error);
         res.status(500).send({ message: "Failed to fetch loans", error });
       }
     });
@@ -107,7 +106,6 @@ async function run() {
           totalPages: Math.ceil(total / limit),
         });
       } catch (error) {
-        console.error("Error fetching loans:", error);
         res.status(500).send({ message: "Failed to fetch loans", error });
       }
     });
@@ -118,7 +116,6 @@ async function run() {
         const result = await loansCollection.findOne(query);
         res.status(200).send(result);
       } catch (error) {
-        console.error("Error fetching loan:", error);
         res.status(500).send({ message: "Failed to fetch loan", error });
       }
     });
@@ -134,7 +131,6 @@ async function run() {
           insertedId: result.insertedId,
         });
       } catch (error) {
-        console.error("Error adding loans:", error);
         res.status(500).send({ message: "Failed to add a loan", error });
       }
     });
@@ -151,7 +147,6 @@ async function run() {
         const result = await usersCollection.find().toArray();
         res.status(200).send(result);
       } catch (error) {
-        console.error("Error fetching users:", error);
         res.status(500).send({ message: "Failed to fetch users", error });
       }
     });
@@ -171,7 +166,6 @@ async function run() {
         const result = await usersCollection.findOne(query);
         res.status(200).send(result);
       } catch (error) {
-        console.error("Error fetching users:", error);
         res.status(500).send({ message: "Failed to fetch users", error });
       }
     });
@@ -206,7 +200,6 @@ async function run() {
           insertedId: result.insertedId,
         });
       } catch (error) {
-        console.error("Error adding User:", error);
         res.status(500).send({ message: "Failed to add a user", error });
       }
     });
@@ -244,7 +237,6 @@ async function run() {
           .toArray();
         res.status(200).send(result);
       } catch (error) {
-        console.error("Error fetching loan applications:", error);
         res
           .status(500)
           .send({ message: "Failed to fetch loan applications", error });
@@ -265,7 +257,6 @@ async function run() {
           insertedId: result.insertedId,
         });
       } catch (error) {
-        console.error("Error adding Loan Application:", error);
         res
           .status(500)
           .send({ message: "Failed to add a loan application", error });
@@ -287,12 +278,53 @@ async function run() {
         );
         res.status(200).send(result);
       } catch (error) {
-        console.error("Error updating loan applications:", error);
         res
           .status(500)
           .send({ message: "Failed to update loan applications", error });
       }
     });
+    app.patch(
+      "/loan-application/:id/approve",
+      verifyFBToken,
+      verifyManager,
+      async (req, res) => {
+        const { id } = req.params;
+        const query = { _id: new ObjectId(id) };
+
+        const updatedDoc = {
+          $set: {
+            applicationStatus: "approved",
+            approvedAt: new Date(),
+          },
+        };
+        const result = await loanApplicationsCollection.updateOne(
+          query,
+          updatedDoc
+        );
+        res.send(result);
+      }
+    );
+    app.patch(
+      "/loan-application/:id/reject",
+      verifyFBToken,
+      verifyManager,
+      async (req, res) => {
+        const { id } = req.params;
+        const query = { _id: new ObjectId(id) };
+
+        const updatedDoc = {
+          $set: {
+            applicationStatus: "rejected",
+            approvedAt: new Date(),
+          },
+        };
+        const result = await loanApplicationsCollection.updateOne(
+          query,
+          updatedDoc
+        );
+        res.send(result);
+      }
+    );
     app.delete("/loan-application/:id", verifyFBToken, async (req, res) => {
       try {
         const { id } = req.params;
@@ -300,7 +332,6 @@ async function run() {
         const result = await loanApplicationsCollection.deleteOne(query);
         res.status(200).send(result);
       } catch (error) {
-        console.error("Error delete loan applications:", error);
         res
           .status(500)
           .send({ message: "Failed to delete loan applications", error });
@@ -341,16 +372,13 @@ async function run() {
     app.patch("/payment-success", async (req, res) => {
       const sessionId = req.query.session_id;
       if (sessionId) {
-        // console.log(sessionId);
         const session = await stripe.checkout.sessions.retrieve(sessionId);
-        console.log(session);
         if (session.payment_status === "paid") {
           const applicationId = session.metadata.applicationId;
           const query = { _id: new ObjectId(applicationId) };
           const loanApplication = await loanApplicationsCollection.findOne(
             query
           );
-          // console.log(loanApplication);
           if (loanApplication) {
             const updatedDoc = {
               $set: {
@@ -377,10 +405,10 @@ async function run() {
       res.send({ success: true });
     });
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
+    // await client.db("admin").command({ ping: 1 });
+    // console.log(
+    //   "Pinged your deployment. You successfully connected to MongoDB!"
+    // );
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
