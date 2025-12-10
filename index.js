@@ -252,8 +252,8 @@ async function run() {
         const application = req.body;
         if (application) {
           application.createdAt = new Date();
-          application.status = "pending";
-          application.applicationStatus = "unpaid";
+          application.applicationStatus = "pending";
+          application.paymentStatus = "unpaid";
           application.applicationFee = 10;
         }
         const result = await loanApplicationsCollection.insertOne(application);
@@ -310,23 +310,68 @@ async function run() {
       const session = await stripe.checkout.sessions.create({
         line_items: [
           {
-            // price: "prod_TZgKjNiuhirw1C",
             price: "price_1ScWxQ2a4KlqyhEpIlSPnr4N",
+            // price_data: {
+            //   currency: "USD",
+            //   unit_amount: 10000,
+            //   product_data: {
+            //     name: paymentInfo.title,
+            //   },
+            // },
             quantity: 1,
           },
         ],
-
+        customer_email: paymentInfo.email,
         mode: "payment",
         metadata: {
           applicationId: paymentInfo.applicationId,
           loanTitle: paymentInfo.title,
           applicantEmail: paymentInfo.email,
+          category: paymentInfo.category,
         },
-        success_url: `${process.env.SITE_DOMAIN}/dashboard/success`,
+        success_url: `${process.env.SITE_DOMAIN}/dashboard/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${process.env.SITE_DOMAIN}/dashboard/cancelled`,
       });
-      console.log(session);
       res.send({ url: session.url });
+    });
+
+    app.patch("/payment-success", async (req, res) => {
+      const sessionId = req.query.session_id;
+      if (sessionId) {
+        // console.log(sessionId);
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
+        console.log(session);
+        if (session.payment_status === "paid") {
+          const applicationId = session.metadata.applicationId;
+          const query = { _id: new ObjectId(applicationId) };
+          const loanApplication = await loanApplicationsCollection.findOne(
+            query
+          );
+          // console.log(loanApplication);
+          if (loanApplication) {
+            const updatedDoc = {
+              $set: {
+                paymentStatus: "paid",
+                paidAt: new Date(),
+              },
+            };
+            const result = await loanApplicationsCollection.updateOne(
+              query,
+              updatedDoc
+            );
+            const paymentInfo = {
+              amount: session.amount_total / 100,
+              transactionId: session.payment_intent,
+              email: session.metadata.applicantEmail,
+              applicationId,
+              title: session.metadata.loanTitle,
+              ApplicationStatus: session.payment_status,
+            };
+            return res.send(result, paymentInfo);
+          }
+        }
+      }
+      res.send({ success: true });
     });
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
