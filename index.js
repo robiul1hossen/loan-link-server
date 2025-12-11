@@ -110,6 +110,15 @@ async function run() {
         res.status(500).send({ message: "Failed to fetch loans", error });
       }
     });
+    app.get("/loans/:email/manager", async (req, res) => {
+      const { email } = req.params;
+      const query = {};
+      if (email) {
+        query.creatorEmail = email;
+      }
+      const result = await loansCollection.find(query).toArray();
+      res.send(result);
+    });
     app.get("/loans/:id", verifyFBToken, async (req, res) => {
       try {
         const { id } = req.params;
@@ -135,48 +144,79 @@ async function run() {
         res.status(500).send({ message: "Failed to add a loan", error });
       }
     });
-    app.patch("/loans/featured/:id", async (req, res) => {
-      const { isFeatured } = req.body;
-      const { id } = req.params;
-      const query = { _id: id };
+    app.patch(
+      "/loans/featured/:id",
+      verifyFBToken,
+      verifyAdmin,
+      async (req, res) => {
+        const { isFeatured } = req.body;
+        const { id } = req.params;
+        const query = { _id: id };
 
-      if (isFeatured === true) {
-        const count = await loansCollection.countDocuments({
-          isFeatured: true,
-        });
-        if (count >= 6) {
-          return res.send({ message: "cannot add more than 6 card" });
+        if (isFeatured === true) {
+          const count = await loansCollection.countDocuments({
+            isFeatured: true,
+          });
+          if (count >= 6) {
+            return res.send({ message: "cannot add more than 6 card" });
+          }
         }
-      }
 
-      const loan = await loansCollection.findOne(query);
+        const loan = await loansCollection.findOne(query);
 
-      if (loan.isFeatured === true) {
-        const update = {
-          $set: {
-            isFeatured: (loan.isFeatured = false),
-          },
-        };
-        const result = await loansCollection.updateOne(query, update);
-        return res.send(result);
+        if (loan.isFeatured === true) {
+          const update = {
+            $set: {
+              isFeatured: (loan.isFeatured = false),
+            },
+          };
+          const result = await loansCollection.updateOne(query, update);
+          return res.send(result);
+        }
+        if (loan.isFeatured === false) {
+          const update = {
+            $set: {
+              isFeatured: (loan.isFeatured = true),
+            },
+          };
+          const result = await loansCollection.updateOne(query, update);
+          return res.send(result);
+        }
+        // console.log(loan);
       }
-      if (loan.isFeatured === false) {
-        const update = {
-          $set: {
-            isFeatured: (loan.isFeatured = true),
-          },
+    );
+    app.patch(
+      "/loans/:id/manager",
+      verifyFBToken,
+      verifyManager,
+      async (req, res) => {
+        const { id } = req.params;
+        const query = { _id: new ObjectId(id) };
+        const updatedLoan = req.body;
+        const updatedDoc = {
+          $set: { ...updatedLoan },
         };
-        const result = await loansCollection.updateOne(query, update);
-        return res.send(result);
+        const result = await loansCollection.updateOne(query, updatedDoc);
+        res.send(result);
       }
-      // console.log(loan);
-    });
+    );
     app.delete("/loans/:id", verifyFBToken, verifyAdmin, async (req, res) => {
       const { id } = req.params;
       const query = { _id: new ObjectId(id) };
       const result = await loansCollection.deleteOne(query);
       res.send(result);
     });
+    app.delete(
+      "/loans/:id/manager",
+      verifyFBToken,
+      verifyManager,
+      async (req, res) => {
+        const { id } = req.params;
+        const query = { _id: new ObjectId(id) };
+        const result = await loansCollection.deleteOne(query);
+        res.send(result);
+      }
+    );
 
     // users related apis
     app.get("/users", verifyFBToken, verifyAdmin, async (req, res) => {
