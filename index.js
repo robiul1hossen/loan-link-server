@@ -119,6 +119,31 @@ async function run() {
       const result = await loansCollection.find(query).toArray();
       res.send(result);
     });
+    app.get("/loans/filter", async (req, res) => {
+      const { category, creatorEmail } = req.query;
+      console.log(req.query);
+      const query = {};
+      if (category) {
+        query.category = category;
+        query.creatorEmail = creatorEmail;
+      }
+      const result = await loansCollection.find(query).toArray();
+
+      res.send(result);
+    });
+    app.get("/loans/search", async (req, res) => {
+      const { keyword, creatorEmail } = req.query;
+      const results = await loansCollection
+        .find({
+          title: { $regex: keyword, $options: "i" },
+        })
+        .toArray();
+      const myData = results.filter(
+        (result) => result.creatorEmail === creatorEmail
+      );
+
+      res.send(myData);
+    });
     app.get("/loans/:id", verifyFBToken, async (req, res) => {
       try {
         const { id } = req.params;
@@ -273,13 +298,10 @@ async function run() {
           ];
         }
 
-        console.log("MONGO QUERY:", query);
-
         const result = await usersCollection.find(query).toArray();
         res.send(result);
       } catch (err) {
-        console.error(err);
-        res.status(500).send({ message: "Server error" });
+        res.send({ message: "Server error" });
       }
     });
 
