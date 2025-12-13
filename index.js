@@ -253,6 +253,36 @@ async function run() {
       res.send({ role: result?.role || "Borrower" });
     });
 
+    app.get("/search/user", async (req, res) => {
+      try {
+        const keyword = req.query.keyword?.trim();
+        const roles = req.query["roles[]"];
+
+        const query = {};
+
+        if (roles && roles.length > 0) {
+          query.role = {
+            $in: Array.isArray(roles) ? roles : [roles],
+          };
+        }
+
+        if (keyword) {
+          query.$or = [
+            { displayName: { $regex: keyword, $options: "i" } },
+            { email: { $regex: keyword, $options: "i" } },
+          ];
+        }
+
+        console.log("MONGO QUERY:", query);
+
+        const result = await usersCollection.find(query).toArray();
+        res.send(result);
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: "Server error" });
+      }
+    });
+
     app.post("/users", async (req, res) => {
       try {
         const user = req.body;
