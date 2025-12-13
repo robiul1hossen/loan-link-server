@@ -122,7 +122,6 @@ async function run() {
     });
     app.get("/loans/filter", async (req, res) => {
       const { category, creatorEmail } = req.query;
-      console.log(req.query);
       const query = {};
       if (category) {
         query.category = category;
@@ -208,7 +207,6 @@ async function run() {
           const result = await loansCollection.updateOne(query, update);
           return res.send(result);
         }
-        // console.log(loan);
       }
     );
     app.patch(
@@ -272,6 +270,14 @@ async function run() {
         res.status(500).send({ message: "Failed to fetch users", error });
       }
     });
+
+    app.get("/users/profile/:email", async (req, res) => {
+      const email = req.params.email;
+
+      const user = await usersCollection.findOne({ email });
+      res.send(user);
+    });
+
     app.get("/users/:email/role", async (req, res) => {
       const email = req.params.email;
       const query = { email };
@@ -339,12 +345,16 @@ async function run() {
       verifyAdmin,
       async (req, res) => {
         const id = req.params.id;
-        const { roleStatus } = req.body;
+        const query = { _id: new ObjectId(id) };
+        const { rejectNote } = req.body;
+        const updatedDoc = {
+          $set: {
+            roleStatus: rejectNote.roleStatus,
+            message: rejectNote.message,
+          },
+        };
 
-        const result = await usersCollection.updateOne(
-          { _id: new ObjectId(id) },
-          { $set: { roleStatus } }
-        );
+        const result = await usersCollection.updateOne(query, updatedDoc);
 
         res.send(result);
       }
