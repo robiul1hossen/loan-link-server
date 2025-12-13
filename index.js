@@ -74,6 +74,7 @@ async function run() {
     const usersCollection = db.collection("users");
     const loansCollection = db.collection("loans");
     const loanApplicationsCollection = db.collection("loanApplications");
+    const paymentCollection = db.collection("payments");
 
     // loans related apis
     app.get("/loans/featured", async (req, res) => {
@@ -176,14 +177,14 @@ async function run() {
       async (req, res) => {
         const { isFeatured } = req.body;
         const { id } = req.params;
-        const query = { _id: id };
+        const query = { _id: new ObjectId(id) };
 
         if (isFeatured === true) {
           const count = await loansCollection.countDocuments({
             isFeatured: true,
           });
           if (count >= 6) {
-            return res.send({ message: "cannot add more than 6 card" });
+            return res.send({ message: "cannot add more than 6 loan to home" });
           }
         }
 
@@ -526,12 +527,28 @@ async function run() {
               applicationId,
               title: session.metadata.loanTitle,
               ApplicationStatus: session.payment_status,
+              paidAt: new Date(),
             };
+            if (paymentInfo) {
+              const queryId = { applicationId: paymentInfo.applicationId };
+              const exist = await paymentCollection.findOne(queryId);
+              if (exist) {
+                return res.send({ message: "payment already exist" });
+              }
+              const pay = await paymentCollection.insertOne(paymentInfo);
+              return res.send(pay);
+            }
             return res.send(result, paymentInfo);
           }
         }
       }
       res.send({ success: true });
+    });
+    app.get("/payment/details/:id", async (req, res) => {
+      const { id } = req.params;
+      const query = { applicationId: id };
+      const result = await paymentCollection.findOne(query);
+      res.send(result);
     });
     // Send a ping to confirm a successful connection
     // await client.db("admin").command({ ping: 1 });
