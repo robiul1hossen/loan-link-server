@@ -111,16 +111,21 @@ async function run() {
         res.status(500).send({ message: "Failed to fetch loans", error });
       }
     });
-    app.get("/loans/:email/manager", async (req, res) => {
-      const { email } = req.params;
-      const query = {};
-      if (email) {
-        query.creatorEmail = email;
+    app.get(
+      "/loans/:email/manager",
+      verifyFBToken,
+      verifyManager,
+      async (req, res) => {
+        const { email } = req.params;
+        const query = {};
+        if (email) {
+          query.creatorEmail = email;
+        }
+        const result = await loansCollection.find(query).toArray();
+        res.send(result);
       }
-      const result = await loansCollection.find(query).toArray();
-      res.send(result);
-    });
-    app.get("/loans/filter", async (req, res) => {
+    );
+    app.get("/loans/filter", verifyFBToken, verifyManager, async (req, res) => {
       const { category, creatorEmail } = req.query;
       const query = {};
       if (category) {
@@ -131,7 +136,7 @@ async function run() {
 
       res.send(result);
     });
-    app.get("/loans/search", async (req, res) => {
+    app.get("/loans/search", verifyFBToken, verifyManager, async (req, res) => {
       const { keyword, creatorEmail } = req.query;
       const results = await loansCollection
         .find({
