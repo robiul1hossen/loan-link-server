@@ -187,7 +187,7 @@ async function run() {
           const count = await loansCollection.countDocuments({
             isFeatured: true,
           });
-          if (count >= 6) {
+          if (count >= 12) {
             return res.send({ message: "cannot add more than 6 loan to home" });
           }
         }
