@@ -149,7 +149,7 @@ async function run() {
 
       res.send(myData);
     });
-    app.get("/loans/:id", verifyFBToken, async (req, res) => {
+    app.get("/loans/:id", async (req, res) => {
       try {
         const { id } = req.params;
         const query = { _id: new ObjectId(id) };
@@ -480,6 +480,38 @@ async function run() {
         res
           .status(500)
           .send({ message: "Failed to delete loan applications", error });
+      }
+    });
+    app.get("/loan-application/stats", async (req, res) => {
+      try {
+        const stats = await loanApplicationsCollection
+          .aggregate([
+            {
+              $group: {
+                _id: "$applicationStatus",
+                value: { $sum: 1 },
+              },
+            },
+          ])
+          .toArray();
+
+        // Ensure all statuses exist
+        const statuses = ["approved", "pending", "rejected"];
+
+        const formattedData = statuses.map((status) => {
+          const found = stats.find((s) => s._id === status);
+          return {
+            name: status.charAt(0).toUpperCase() + status.slice(1),
+            value: found ? found.value : 0,
+          };
+        });
+
+        res.status(200).send(formattedData);
+      } catch (error) {
+        res.status(500).send({
+          message: "Failed to fetch loan statistics",
+          error,
+        });
       }
     });
 
