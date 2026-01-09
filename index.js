@@ -514,6 +514,38 @@ async function run() {
         });
       }
     });
+    app.get("/user/stats", async (req, res) => {
+      try {
+        const stats = await usersCollection
+          .aggregate([
+            {
+              $group: {
+                _id: "$role",
+                count: { $sum: 1 },
+              },
+            },
+          ])
+          .toArray();
+
+        const roles = ["Borrower", "Manager", "Admin"];
+
+        const formattedData = roles.map((role) => {
+          const found = stats.find((s) => s._id === role);
+
+          return {
+            role: role.charAt(0).toUpperCase() + role.slice(1),
+            count: found ? found.count : 0,
+          };
+        });
+
+        res.status(200).send(formattedData);
+      } catch (error) {
+        res.status(500).send({
+          message: "Failed to fetch loan statistics",
+          error,
+        });
+      }
+    });
 
     // payment related apis
     app.post("/create-checkout-session", async (req, res) => {
