@@ -482,70 +482,6 @@ async function run() {
           .send({ message: "Failed to delete loan applications", error });
       }
     });
-    app.get("/loan-application/stats", async (req, res) => {
-      try {
-        const stats = await loanApplicationsCollection
-          .aggregate([
-            {
-              $group: {
-                _id: "$applicationStatus",
-                value: { $sum: 1 },
-              },
-            },
-          ])
-          .toArray();
-
-        // Ensure all statuses exist
-        const statuses = ["approved", "pending", "rejected"];
-
-        const formattedData = statuses.map((status) => {
-          const found = stats.find((s) => s._id === status);
-          return {
-            name: status.charAt(0).toUpperCase() + status.slice(1),
-            value: found ? found.value : 0,
-          };
-        });
-
-        res.status(200).send(formattedData);
-      } catch (error) {
-        res.status(500).send({
-          message: "Failed to fetch loan statistics",
-          error,
-        });
-      }
-    });
-    app.get("/user/stats", async (req, res) => {
-      try {
-        const stats = await usersCollection
-          .aggregate([
-            {
-              $group: {
-                _id: "$role",
-                count: { $sum: 1 },
-              },
-            },
-          ])
-          .toArray();
-
-        const roles = ["Borrower", "Manager", "Admin"];
-
-        const formattedData = roles.map((role) => {
-          const found = stats.find((s) => s._id === role);
-
-          return {
-            role: role.charAt(0).toUpperCase() + role.slice(1),
-            count: found ? found.count : 0,
-          };
-        });
-
-        res.status(200).send(formattedData);
-      } catch (error) {
-        res.status(500).send({
-          message: "Failed to fetch loan statistics",
-          error,
-        });
-      }
-    });
 
     // payment related apis
     app.post("/create-checkout-session", async (req, res) => {
@@ -628,6 +564,209 @@ async function run() {
       const query = { applicationId: id };
       const result = await paymentCollection.findOne(query);
       res.send(result);
+    });
+
+    // Home page chart data
+    app.get("/api/stats", async (req, res) => {
+      try {
+        // const loanApplicationsCollection = db.collection("loanApplications");
+
+        const totalApplications =
+          await loanApplicationsCollection.countDocuments();
+
+        const approvedLoans = await loanApplicationsCollection.countDocuments({
+          applicationStatus: "approved",
+        });
+
+        const pendingLoans = await loanApplicationsCollection.countDocuments({
+          applicationStatus: "pending",
+        });
+
+        // approved loanAmount sum
+        const totalDisbursed = await loanApplicationsCollection
+          .aggregate([
+            { $match: { applicationStatus: "approved" } },
+            {
+              $group: {
+                _id: null,
+                totalAmount: { $sum: { $toDouble: "$loanAmount" } },
+              },
+            },
+          ])
+          .toArray();
+
+        res.json({
+          totalApplications,
+          approvedLoans,
+          pendingLoans,
+          totalDisbursed: totalDisbursed[0].totalAmount,
+        });
+      } catch (error) {
+        res.status(500).json({ message: "Failed to load stats" });
+      }
+    });
+
+    // Chart related apis
+    app.get("/loan-application/stats", async (req, res) => {
+      try {
+        const stats = await loanApplicationsCollection
+          .aggregate([
+            {
+              $group: {
+                _id: "$applicationStatus",
+                value: { $sum: 1 },
+              },
+            },
+          ])
+          .toArray();
+
+        const statuses = ["approved", "pending", "rejected"];
+
+        const formattedData = statuses.map((status) => {
+          const found = stats.find((s) => s._id === status);
+          return {
+            name: status.charAt(0).toUpperCase() + status.slice(1),
+            value: found ? found.value : 0,
+          };
+        });
+
+        res.status(200).send(formattedData);
+      } catch (error) {
+        res.status(500).send({
+          message: "Failed to fetch loan statistics",
+          error,
+        });
+      }
+    });
+    app.get("/user/stats", async (req, res) => {
+      try {
+        const stats = await usersCollection
+          .aggregate([
+            {
+              $group: {
+                _id: "$role",
+                count: { $sum: 1 },
+              },
+            },
+          ])
+          .toArray();
+
+        const roles = ["Borrower", "Manager", "Admin"];
+
+        const formattedData = roles.map((role) => {
+          const found = stats.find((s) => s._id === role);
+
+          return {
+            role: role.charAt(0).toUpperCase() + role.slice(1),
+            count: found ? found.count : 0,
+          };
+        });
+
+        res.status(200).send(formattedData);
+      } catch (error) {
+        res.status(500).send({
+          message: "Failed to fetch loan statistics",
+          error,
+        });
+      }
+    });
+
+    app.get("/loan-application/monthly-stats", async (req, res) => {
+      try {
+        const result = await loanApplicationsCollection
+          .aggregate([
+            {
+              $addFields: {
+                createdAtDate: { $toDate: "$createdAt" },
+              },
+            },
+
+            {
+              $group: {
+                _id: { $month: "$createdAtDate" },
+                applications: { $sum: 1 },
+              },
+            },
+
+            {
+              $sort: { _id: 1 },
+            },
+          ])
+          .toArray();
+
+        const monthNames = [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec",
+        ];
+
+        const formattedData = result.map((item) => ({
+          month: monthNames[item._id - 1],
+          applications: item.applications,
+        }));
+
+        res.status(200).send(formattedData);
+      } catch (error) {
+        res.status(500).send({
+          message: "Failed to fetch monthly loan stats",
+          error,
+        });
+      }
+    });
+
+    app.get("/loan-application/amount-chart", async (req, res) => {
+      try {
+        const result = await loanApplicationsCollection
+          .aggregate([
+            {
+              $addFields: {
+                loanAmountNumber: { $toDouble: "$loanAmount" },
+              },
+            },
+            {
+              $group: {
+                _id: "$applicationStatus",
+                amount: { $sum: "$loanAmountNumber" },
+              },
+            },
+          ])
+          .toArray();
+
+        let approved = 0;
+        let rejected = 0;
+        let pending = 0;
+
+        result.forEach((item) => {
+          if (item._id === "approved") approved = item.amount;
+          if (item._id === "rejected") rejected = item.amount;
+          if (item._id === "pending") pending = item.amount;
+        });
+
+        const total = approved + rejected + pending;
+
+        const chartData = [
+          { name: "Approved", amount: approved },
+          { name: "Rejected", amount: rejected },
+          { name: "Pending", amount: pending },
+          { name: "Total", amount: total },
+        ];
+
+        res.status(200).send(chartData);
+      } catch (error) {
+        res.status(500).send({
+          message: "Failed to load loan chart data",
+          error,
+        });
+      }
     });
   } finally {
   }
